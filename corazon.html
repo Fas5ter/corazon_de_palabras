@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Corazón de Palabras</title>
+<style>
+    :root { --bg: #0c1021; --fg: #ff6ec7; }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 20% 20%, #1f1a2e, #0c1021 60%), radial-gradient(circle at 80% 80%, #1a2438, transparent 50%);
+        color: #e5e5e5;
+        font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .card {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 16px;
+        backdrop-filter: blur(12px);
+        padding: 18px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+        width: min(92vw, 720px);
+    }
+    h1 { margin: 0 0 12px; font-weight: 600; letter-spacing: 0.5px; }
+    .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+    input {
+        flex: 1;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.15);
+        background: rgba(255,255,255,0.04);
+        color: #fff;
+        outline: none;
+        transition: border 0.2s;
+    }
+    input:focus { border-color: #ff7ee2; }
+    button {
+        padding: 12px 18px;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(120deg, #ff7ee2, #7af5ff, #8fff4f);
+        color: #0c1021;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    button:hover { transform: translateY(-1px) scale(1.01); box-shadow: 0 10px 24px rgba(0,0,0,0.25); }
+    canvas {
+        width: 100%;
+        height: 480px;
+        border-radius: 14px;
+        background: radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.06), rgba(255,255,255,0.01));
+    }
+</style>
+</head>
+<body>
+    <div class="card">
+        <h1>Corazón de Palabras</h1>
+        <div class="controls">
+            <input id="nombre" type="text" maxlength="20" placeholder="Escribe un nombre o frase" />
+            <button id="btn">Formar Corazón</button>
+        </div>
+        <canvas id="lienzo" width="800" height="520"></canvas>
+    </div>
+
+<script>
+    const canvas = document.getElementById("lienzo");
+    const ctx = canvas.getContext("2d");
+    const input = document.getElementById("nombre");
+    const btn = document.getElementById("btn");
+    let hueShift = 0;
+    let textPoints = [];
+    let currentWord = "Amor";
+
+    function heartPoints(samples = 600, scale = 16, offsetX = canvas.width / 2, offsetY = canvas.height / 2 + 20) {
+        const pts = [];
+        for (let i = 0; i < samples; i++) {
+            const t = Math.PI * 2 * (i / samples);
+            const x = scale * 16 * Math.sin(t) ** 3;
+            const y = -scale * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+            pts.push({ x: x + offsetX, y: y + offsetY });
+        }
+        return pts;
+    }
+
+    // Letras espaciadas
+    function buildTextPoints(word) {
+        const pts = heartPoints(650, 10);
+        const letters = word.split("");
+        const result = [];
+        const minSpacing = 18; // píxeles de separación mínima
+        let idx = 0;
+        let last = null;
+
+        for (let i = 0; i < pts.length; i++) {
+            const p = pts[i];
+            if (!last) {
+                result.push({ ...p, char: letters[idx % letters.length] });
+                last = p;
+                idx++;
+                continue;
+            }
+            const dx = p.x - last.x;
+            const dy = p.y - last.y;
+            if (Math.hypot(dx, dy) >= minSpacing) {
+                result.push({ ...p, char: letters[idx % letters.length] });
+                last = p;
+                idx++;
+            }
+        }
+        textPoints = result;
+    }
+
+    function drawBackground() {
+        const grd = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        grd.addColorStop(0, "rgba(255,255,255,0.06)");
+        grd.addColorStop(1, "rgba(255,255,255,0.01)");
+        ctx.fillStyle = "#0c1021";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawGlow(x, y, color) {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 22);
+        g.addColorStop(0, color);
+        g.addColorStop(1, "transparent");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, 22, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        drawBackground();
+        hueShift = (hueShift + 0.6) % 360;
+        const t = Date.now() * 0.002;
+        for (let i = 0; i < textPoints.length; i++) {
+            const p = textPoints[i];
+            const h = (hueShift + i) % 360;
+            const wobble = Math.sin(t + i * 0.1) * 1.6;
+            const x = p.x + wobble;
+            const y = p.y + wobble;
+            drawGlow(x, y, `hsla(${h}, 95%, 65%, 0.18)`);
+            ctx.fillStyle = `hsl(${h}, 100%, 70%)`;
+            ctx.font = "bold 16px 'Poppins', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(p.char, x, y);
+        }
+    }
+
+    btn.addEventListener("click", () => {
+        const val = input.value.trim();
+        currentWord = val.length ? val : "Amor";
+        buildTextPoints(currentWord);
+    });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") btn.click(); });
+
+    buildTextPoints(currentWord);
+    animate();
+</script>
+</body>
+</html>
